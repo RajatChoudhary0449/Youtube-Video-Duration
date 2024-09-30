@@ -59,7 +59,7 @@ function App() {
       }
     };
     fetchData();
-  }, [link, start, end]);
+  }, [link]);
   const handlerequest = async () => {
     const startIndex = (start > 0) ? (start - 1) : 0;
     const endIndex = (end === Infinity) ? (end) : (end - 1);
