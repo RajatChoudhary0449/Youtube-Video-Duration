@@ -63,8 +63,12 @@ function App() {
   const handlerequest = async () => {
     const startIndex = (start > 0) ? (start - 1) : 0;
     const endIndex = (end === Infinity) ? (end) : (end - 1);
+    if (link.length === 0) {
+      alert("Link cannot be left empty.");
+      return;
+    }
     if (!data || !data.length) {
-      alert('Please enter a valid YouTube playlist URL.');
+      alert(`Please enter a valid YouTube playlist URL. `);
       return;
     }
 
@@ -116,9 +120,15 @@ function App() {
 
   const checkfocus = (e) => {
     if (!data.length) {
-      alert(`Your playlist is not correct so you cannot go to ${e.target.id} input field`);
+      if (link !== '')
+        alert(`Your playlist is not correct so you cannot go to ${e.target.id} input field , ${link}, ${data}`);
+      else
+        alert(`Your playlist field cannot be left empty please fill it.`);
       inputref.current.focus();
       document.getElementById("result").innerText = "";
+    }
+    else {
+      e.target.removeAttribute("readonly")
     }
   }
   return (
@@ -127,13 +137,14 @@ function App() {
       <form method='post' onSubmit={(e) => { handleformrequest(e); }}>
 
         <label htmlFor="link">Enter the link of the YouTube playlist:</label>
-        <input type="text" id="link" placeholder="Playlist URL" value={link} onChange={(e) => { changelink(e.target.value); }} ref={inputref}></input>
+        <input type="text" id="link" placeholder="Playlist URL" autoComplete="off" value={link} onChange={(e) => { changelink(e.target.value); }} ref={inputref}></input>
 
         <label htmlFor="start">Starting Video Index (1-based):</label>
-        <input type="number" id="start" placeholder="Start Index(Optional)" value={(start === -1) ? '' : start} onFocus={e => { checkfocus(e); }} onChange={(e) => {
+        <input type="number" id="start" placeholder="Start Index(Optional)" value={(start === -1) ? '' : start} onFocus={e => { checkfocus(e); }} readOnly onBlur={(e) => { e.target.setAttribute("Readonly", 'true') }} onChange={(e) => {
           setstart(prev => {
             if (e.target.value === '') return -1;
             const cur = Number(e.target.value);
+            if (cur > end) return end;
             if (data.length === 0) return cur;
             if (cur < 1) return 1;
             if (cur <= data.length) return cur;
@@ -142,13 +153,17 @@ function App() {
         }}></input>
 
         <label htmlFor="end">Ending Video Index (1-based):</label>
-        <input type="number" id="end" placeholder="End Index(Optional)" value={end === Infinity ? '' : end} onFocus={e => { checkfocus(e); }} onChange={(e) => {
+        <input type="number" id="end" placeholder="End Index(Optional)" value={end === Infinity ? '' : end} onFocus={e => { checkfocus(e); }} readOnly onBlur={(e) => { e.target.setAttribute("Readonly", 'true'); if (end < start) setend(start); }} onChange={(e) => {
           setend(prev => {
             if (e.target.value === '') return Infinity;
-            const cur = Number(e.target.value);
+            let cur = Number(e.target.value);
             if (!data.length) return cur;
-            if (cur > data.length) return data.length;
-            else return cur;
+            if (cur < 1) return 1;
+            while (cur > data.length) {
+              cur = String(cur).substring(1);
+              cur = Number(cur);
+            }
+            return cur;
           });
         }}></input>
 
