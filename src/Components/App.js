@@ -18,7 +18,7 @@ function App() {
         setdata([]);
         return;
       }
-      const playlistItemsUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=500&playlistId=${playlistId}&key=${apiKey}`;
+      const playlistItemsUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&playlistId=${playlistId}&key=${apiKey}`;
       const videoIds = [];
       let nextPageToken = '';
       if (link === "") return;
@@ -46,11 +46,18 @@ function App() {
         nextPageToken = curdata.nextPageToken;
       }
       while (nextPageToken);
-      const videoDetailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds.join(',')}&key=${apiKey}`;
-      const videoResponse = await fetch(videoDetailsUrl);
-      let curdata = await videoResponse.json();
-      curdata = curdata.items;
-      setdata(curdata);
+
+      // Fetch video details in batches of 50
+      const videoDetails = [];
+      for (let i = 0; i < videoIds.length; i += 50) {
+        const batchIds = videoIds.slice(i, i + 50).join(',');
+        const videoDetailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${batchIds}&key=${apiKey}`;
+        const videoResponse = await fetch(videoDetailsUrl);
+        const videoData = await videoResponse.json();
+        videoDetails.push(...videoData.items);
+      }
+
+      setdata(videoDetails);
       if (start !== -1) {
         setstart(-1);
       }
@@ -81,7 +88,7 @@ function App() {
     }
   }
   function extractPlaylistId(url) {
-    const regex = /(?:list=)([^&]+)/;
+    const regex = /[?&]list=([^&]+)/;
     const match = url.match(regex);
     return match ? match[1] : null;
   }
@@ -108,10 +115,12 @@ function App() {
   }
 
   function formatDuration(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor(seconds / 3600) % 24;
+    const minutes = Math.floor((seconds % 3600) / 60) % 60;
     const remainingSeconds = seconds % 60;
-    return `${hours}h ${minutes}m ${remainingSeconds}s`;
+    if (days) return `${days}d ${hours}h ${minutes}m ${remainingSeconds}s`;
+    else return `${hours}h ${minutes}m ${remainingSeconds}s`;
   }
 
   const handleformrequest = (e) => {
@@ -121,7 +130,7 @@ function App() {
   const checkfocus = (e) => {
     if (!data.length) {
       if (link !== '')
-        alert(`Your playlist is not correct so you cannot go to ${e.target.id} input field , ${link}, ${data}`);
+        alert(`Your playlist is not correct so you cannot go to ${e.target.id} input field`);
       else
         alert(`Your playlist field cannot be left empty please fill it.`);
       inputref.current.focus();
