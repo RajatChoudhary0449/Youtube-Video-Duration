@@ -1,89 +1,97 @@
 import './styles.css';
 import React, { useEffect, useRef, useState } from 'react'
+import ShowDetails from './ShowDetails';
 
 function App() {
   const [link, changelink] = useState("")
+  const [time, settime] = useState([0, 0, 0, 0]);
   const [start, setstart] = useState(-1)
   const [end, setend] = useState(Infinity)
-  const [data, setdata] = useState([]);
+  const [data, setdata] = useState([]);//Playlist list.
+  const [showdetail, setshowdetail] = useState(false);
   const inputref = useRef();
-  useEffect(() => {
-    inputref.current.focus();
-  }, []);
-  useEffect(() => {
-    const fetchData = async () => {
-      const apiKey = process.env.REACT_APP_API_KEY;
-      const playlistId = extractPlaylistId(link);
-      if (!playlistId) {
-        setdata([]);
-        return;
-      }
-      const playlistItemsUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&playlistId=${playlistId}&key=${apiKey}`;
-      const videoIds = [];
-      let nextPageToken = '';
-      if (link === "") return;
-      do {
-        let response;
-        try {
-          response = await fetch(playlistItemsUrl + (nextPageToken ? `&pageToken=${nextPageToken}` : ''));
-          if (!response.ok) {
-            if (response.status === 404) {
-              setdata([]);
-              setstart(-1);
-              setend(Infinity);
-            }
-            return;
+  const fetchData = async () => {
+    const apiKey = process.env.REACT_APP_API_KEY;
+    const playlistId = extractPlaylistId(link);
+    if (!playlistId) {
+      setdata([]);
+      return;
+    }
+    const playlistItemsUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&playlistId=${playlistId}&key=${apiKey}`;
+    const videoIds = [];
+    let nextPageToken = '';
+    if (link === "") return;
+    do {
+      let response;
+      try {
+        response = await fetch(playlistItemsUrl + (nextPageToken ? `&pageToken=${nextPageToken}` : ''));
+        if (!response.ok) {
+          if (response.status === 404) {
+            setdata([]);
+            setstart(-1);
+            setend(Infinity);
           }
+          return;
         }
-        catch (error) {
-          alert("Network Error");
-        }
-        const curdata = await response.json();
-        if (!curdata || !curdata.items) return;
-        curdata.items.forEach(item => {
-          videoIds.push(item.contentDetails.videoId);
-        });
-        nextPageToken = curdata.nextPageToken;
       }
-      while (nextPageToken);
+      catch (error) {
+        alert("Network Error");
+      }
+      const curdata = await response.json();
+      if (!curdata || !curdata.items) return;
+      curdata.items.forEach(item => {
+        videoIds.push(item.contentDetails.videoId);
+      });
+      nextPageToken = curdata.nextPageToken;
+    }
+    while (nextPageToken);
 
-      // Fetch video details in batches of 50
-      const videoDetails = [];
-      for (let i = 0; i < videoIds.length; i += 50) {
-        const batchIds = videoIds.slice(i, i + 50).join(',');
-        const videoDetailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${batchIds}&key=${apiKey}`;
-        const videoResponse = await fetch(videoDetailsUrl);
-        const videoData = await videoResponse.json();
-        videoDetails.push(...videoData.items);
-      }
+    // Fetch video details in batches of 50
+    const videoDetails = [];
+    for (let i = 0; i < videoIds.length; i += 50) {
+      const batchIds = videoIds.slice(i, i + 50).join(',');
+      const videoDetailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${batchIds}&key=${apiKey}`;
+      const videoResponse = await fetch(videoDetailsUrl);
+      const videoData = await videoResponse.json();
+      videoDetails.push(...videoData.items);
+    }
 
-      setdata(videoDetails);
-      if (start !== -1) {
-        setstart(-1);
-      }
-      if (end !== Infinity) {
-        setend(Infinity);
-      }
-    };
+    setdata(videoDetails);
+    if (start !== -1) {
+      setstart(-1);
+    }
+    if (end !== Infinity) {
+      setend(Infinity);
+    }
+  };
+  useEffect(() => {
     fetchData();
+    setshowdetail(false);
   }, [link]);
+  useEffect(() => {
+    setshowdetail(false);
+    document.getElementById('result').innerText = '';
+  }, [start, end])
   const handlerequest = async () => {
     const startIndex = (start > 0) ? (start - 1) : 0;
     const endIndex = (end === Infinity) ? (end) : (end - 1);
     if (link.length === 0) {
       alert("Link cannot be left empty.");
+      setshowdetail(false);
       return;
     }
     if (!data || !data.length) {
       alert(`Please enter a valid YouTube playlist URL. `);
+      setshowdetail(false);
       return;
     }
-
     try {
       const totalDuration = await getPlaylistDuration(startIndex, endIndex);
       document.getElementById('result').innerText = `Total Duration: ${formatDuration(totalDuration)}`;
+      setshowdetail(true);
     } catch (error) {
       console.error(error);
+      setshowdetail(false)
       document.getElementById('result').innerText = 'Error fetching playlist duration.';
     }
   }
@@ -106,12 +114,13 @@ function App() {
   }
 
   function parseISO8601Duration(duration) {
-    const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
+    const regex = /P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
     const matches = duration.match(regex);
-    const hours = parseInt(matches[1] || 0);
-    const minutes = parseInt(matches[2] || 0);
-    const seconds = parseInt(matches[3] || 0);
-    return hours * 3600 + minutes * 60 + seconds;
+    const days = parseInt(matches[1] || 0);
+    const hours = parseInt(matches[2] || 0);
+    const minutes = parseInt(matches[3] || 0);
+    const seconds = parseInt(matches[4] || 0);
+    return (days * 86400) + (hours * 3600) + (minutes * 60) + seconds;
   }
 
   function formatDuration(seconds) {
@@ -140,13 +149,15 @@ function App() {
       e.target.removeAttribute("readonly")
     }
   }
+
+
   return (
     <div className="container">
       <h1>YouTube Playlist Duration Calculator</h1>
       <form method='post' onSubmit={(e) => { handleformrequest(e); }}>
 
         <label htmlFor="link">Enter the link of the YouTube playlist:</label>
-        <input type="text" id="link" placeholder="Playlist URL" autoComplete="off" value={link} onChange={(e) => { changelink(e.target.value); }} ref={inputref}></input>
+        <input type="text" id="link" placeholder="Playlist URL" autoComplete="off" autoFocus value={link} onChange={(e) => { changelink(e.target.value); }} ref={inputref}></input>
 
         <label htmlFor="start">Starting Video Index (1-based):</label>
         <input type="number" id="start" placeholder="Start Index(Optional)" value={(start === -1) ? '' : start} onFocus={e => { checkfocus(e); }} readOnly onBlur={(e) => { e.target.setAttribute("Readonly", 'true') }} onChange={(e) => {
@@ -176,9 +187,10 @@ function App() {
           });
         }}></input>
 
-        <button id="calculate" onClick={handlerequest}>Get Total Duration</button>
+        <button id="calculate" type='submit' onClick={handlerequest}>Get Total Duration</button>
         <p id="result"></p>
-      </form>
+        <ShowDetails visibility={showdetail} start={start} end={end} parseISO8601Duration={parseISO8601Duration} formatDuration={formatDuration} data={data}></ShowDetails>
+      </form >
     </div >
   );
 }
