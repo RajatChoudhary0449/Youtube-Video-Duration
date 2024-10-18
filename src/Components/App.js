@@ -1,16 +1,15 @@
 import './styles.css';
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import ShowDetails from './ShowDetails';
 
 function App() {
   const [link, changelink] = useState("")
-  const [time, settime] = useState([0, 0, 0, 0]);
   const [start, setstart] = useState(-1)
   const [end, setend] = useState(Infinity)
   const [data, setdata] = useState([]);//Playlist list.
   const [showdetail, setshowdetail] = useState(false);
   const inputref = useRef();
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const apiKey = process.env.REACT_APP_API_KEY;
     const playlistId = extractPlaylistId(link);
     if (!playlistId) {
@@ -45,7 +44,6 @@ function App() {
       nextPageToken = curdata.nextPageToken;
     }
     while (nextPageToken);
-
     // Fetch video details in batches of 50
     const videoDetails = [];
     for (let i = 0; i < videoIds.length; i += 50) {
@@ -57,17 +55,12 @@ function App() {
     }
 
     setdata(videoDetails);
-    if (start !== -1) {
-      setstart(-1);
-    }
-    if (end !== Infinity) {
-      setend(Infinity);
-    }
-  };
+  }, [link]);
+
   useEffect(() => {
     fetchData();
     setshowdetail(false);
-  }, [link]);
+  }, [link, fetchData]);
   useEffect(() => {
     setshowdetail(false);
     document.getElementById('result').innerText = '';
@@ -103,9 +96,27 @@ function App() {
   async function getPlaylistDuration(startIndex, endIndex) {
     const selectedVideoIds = data.slice(startIndex, endIndex + 1);
     const videoDurations = await getVideoDurations(selectedVideoIds);
-    return videoDurations.reduce((total, duration) => total + duration, 0);
+    const curtime = [0, 0, 0, 0];
+    for (let i = 0; i < videoDurations.length; i++) {
+      for (let j = 0; j < curtime.length; j++) curtime[j] += videoDurations[i][j];
+      updatetime(curtime);
+    }
+    return curtime;
   }
-
+  function updatetime(time) {
+    if (time[3] >= 60) {
+      time[2] += Math.floor(time[3] / 60);
+      time[3] %= 60;
+    }
+    if (time[2] >= 60) {
+      time[1] += Math.floor(time[2] / 60);
+      time[2] %= 60;
+    }
+    if (time[1] >= 24) {
+      time[0] += Math.floor(time[1] / 24);
+      time[1] %= 24;
+    }
+  }
   async function getVideoDurations(data) {
     return data.map(item => {
       const duration = item.contentDetails.duration;
@@ -120,18 +131,13 @@ function App() {
     const hours = parseInt(matches[2] || 0);
     const minutes = parseInt(matches[3] || 0);
     const seconds = parseInt(matches[4] || 0);
-    return (days * 86400) + (hours * 3600) + (minutes * 60) + seconds;
+    return [days, hours, minutes, seconds];
   }
-
-  function formatDuration(seconds) {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor(seconds / 3600) % 24;
-    const minutes = Math.floor((seconds % 3600) / 60) % 60;
-    const remainingSeconds = seconds % 60;
-    if (days) return `${days}d ${hours}h ${minutes}m ${remainingSeconds}s`;
+  function formatDuration(time) {
+    const [days, hours, minutes, remainingSeconds] = time;
+    if (time[0]) return `${days}d ${hours}h ${minutes}m ${remainingSeconds}s`;
     else return `${hours}h ${minutes}m ${remainingSeconds}s`;
   }
-
   const handleformrequest = (e) => {
     e.preventDefault();
   }
@@ -149,15 +155,13 @@ function App() {
       e.target.removeAttribute("readonly")
     }
   }
-
-
   return (
     <div className="container">
       <h1>YouTube Playlist Duration Calculator</h1>
       <form method='post' onSubmit={(e) => { handleformrequest(e); }}>
 
         <label htmlFor="link">Enter the link of the YouTube playlist:</label>
-        <input type="text" id="link" placeholder="Playlist URL" autoComplete="off" autoFocus value={link} onChange={(e) => { changelink(e.target.value); }} ref={inputref}></input>
+        <input type="text" id="link" placeholder="Playlist URL" autoComplete="off" autoFocus value={link} onChange={(e) => { changelink(e.target.value); }} ref={inputref} onFocus={(e) => { setstart(-1); setend(Infinity); }}></input>
 
         <label htmlFor="start">Starting Video Index (1-based):</label>
         <input type="number" id="start" placeholder="Start Index(Optional)" value={(start === -1) ? '' : start} onFocus={e => { checkfocus(e); }} readOnly onBlur={(e) => { e.target.setAttribute("Readonly", 'true') }} onChange={(e) => {
@@ -170,7 +174,7 @@ function App() {
             if (cur <= data.length) return cur;
             else return prev;
           });
-        }}></input>
+        }} />
 
         <label htmlFor="end">Ending Video Index (1-based):</label>
         <input type="number" id="end" placeholder="End Index(Optional)" value={end === Infinity ? '' : end} onFocus={e => { checkfocus(e); }} readOnly onBlur={(e) => { e.target.setAttribute("Readonly", 'true'); if (end < start) setend(start); }} onChange={(e) => {
@@ -185,11 +189,11 @@ function App() {
             }
             return cur;
           });
-        }}></input>
+        }} />
 
         <button id="calculate" type='submit' onClick={handlerequest}>Get Total Duration</button>
         <p id="result"></p>
-        <ShowDetails visibility={showdetail} start={start} end={end} parseISO8601Duration={parseISO8601Duration} formatDuration={formatDuration} data={data}></ShowDetails>
+        <ShowDetails visibility={showdetail} start={start} end={end} parseISO8601Duration={parseISO8601Duration} formatDuration={formatDuration} data={data} updatetime={updatetime}></ShowDetails>
       </form >
     </div >
   );

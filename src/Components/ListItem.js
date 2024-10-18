@@ -1,7 +1,6 @@
 import React from 'react'
 
 export default function ListItem({ idx, curtime, totaltime }) {
-
     return (
         <tr>
             <td>{idx}</td>

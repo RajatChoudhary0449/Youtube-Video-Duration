@@ -1,0 +1,38 @@
+.Link-header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    /* Align items to the right */
+    justify-content: center;
+    font-size: calc(16px);
+    color: white;
+}
+
+.App-link {
+    color: #28a745;
+    /* Green color */
+    text-decoration: none;
+    /* Remove underline */
+    font-weight: bold;
+    /* Make the text bold */
+    padding: 10px 15px;
+    /* Add padding */
+    border-radius: 5px;
+    /* Round corners */
+    transition: background-color 0.3s, color 0.3s;
+    /* Smooth transition */
+}
+
+.App-link:hover {
+    background-color: rgba(40, 167, 69, 0.2);
+    /* Light green background on hover */
+    color: #218838;
+    /* Darker green on hover */
+}
+
+.App-link:active {
+    background-color: #218838;
+    /* Dark green when active */
+    color: white;
+    /* Change text color to white */
+}

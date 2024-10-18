@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import Details from './Details';
-export default function ShowDetails({ visibility, start, end, parseISO8601Duration, formatDuration, data }) {
+import './ShowDetails.css';
+export default function ShowDetails({ visibility, start, end, parseISO8601Duration, formatDuration, data, updatetime }) {
     const [isvisible, setisvisible] = useState(false);
     const [text, settext] = useState("show details");
     if (visibility === false) return (<></>);
@@ -11,14 +12,14 @@ export default function ShowDetails({ visibility, start, end, parseISO8601Durati
             else return "show details";
         })
         e.preventDefault()
-        const curdata = (data.map(curdata => formatDuration(parseISO8601Duration(curdata.contentDetails.duration))));
-        console.log(curdata);
     }
     return (
         <>
-            <a href="/" onClick={handleDetails}>{text}</a>
-            <div class="Details" >
-                <Details items={data.slice((start > 0) ? (start - 1) : 0, ((end === Infinity) ? (end) : (end - 1)) + 1)} isvisible={isvisible} parseISO8601Duration={parseISO8601Duration} formatDuration={formatDuration} start={start === -1 ? 1 : start}></Details>
+            <div className="Link-header">
+                <a href="/" className="App-link" onClick={handleDetails}>{text}</a>
+            </div>
+            <div className="Details" >
+                <Details items={data.slice((start > 0) ? (start - 1) : 0, ((end === Infinity) ? (end) : (end - 1)) + 1)} isvisible={isvisible} parseISO8601Duration={parseISO8601Duration} formatDuration={formatDuration} start={start === -1 ? 1 : start} updatetime={updatetime}></Details>
             </div>
         </>
     )
