@@ -2,13 +2,14 @@ import React from 'react'
 import ListItem from './ListItem';
 import './Details.css';
 export default function Details(props) {
-    const { items, isvisible, parseISO8601Duration, formatDuration, start, updatetime } = props;
+    const { items, isvisible } = props;
+    function formatDuration(time) {
+        const [days, hours, minutes, remainingSeconds] = time;
+        if (time[0]) return `${days}d ${hours}h ${minutes}m ${remainingSeconds}s`;
+        else return `${hours}h ${minutes}m ${remainingSeconds}s`;
+    }
     if (!isvisible) return (<></>);
-    let curitems = items.map((item) => parseISO8601Duration(item.contentDetails.duration))
     if (items.length === 0) return <p>No Items to show</p>;
-    let curidx = start - 1;
-    let curtime;
-    let time = [0, 0, 0, 0];
     return (
         <table>
             <thead>
@@ -19,13 +20,9 @@ export default function Details(props) {
                 </tr>
             </thead>
             <tbody>
-                {curitems.map(item => {
-                    curidx = curidx + 1;
-                    curtime = (item);
-                    for (let i = 0; i < curtime.length; i++) time[i] += curtime[i];
-                    updatetime(time);
-                    return (<ListItem key={curidx} idx={curidx} curtime={formatDuration(curtime)}
-                        totaltime={formatDuration(time)} ></ListItem>)
+                {items.map(item => {
+                    return (<ListItem key={item['idx']} idx={item['idx']} curtime={formatDuration(item['curtime'])}
+                        totaltime={formatDuration(item['totaltime'])} ></ListItem>)
                 })
                 }
             </tbody>

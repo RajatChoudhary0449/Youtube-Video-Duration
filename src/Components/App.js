@@ -7,34 +7,70 @@ function App() {
   const [start, setstart] = useState(-1)
   const [end, setend] = useState(Infinity)
   const [data, setdata] = useState([]);//Playlist list.
-  const [showdetail, setshowdetail] = useState(false);
+  const [time, settime] = useState([]);
+  const [fetching, setFetching] = useState(false);
+  const [resultmessage, setresultmessage] = useState("");
   const inputref = useRef();
-  const fetchData = useCallback(async () => {
+  const handlestart = (e) => {
+    setstart(prev => {
+      if (e.target.value === '') return -1;
+      if (e.target.value[e.target.value - 1] === '.' || e.target.value[e.target.value - 1] === '-') return prev;
+      const cur = Number(e.target.value);
+      if (cur > end) return end;
+      if (data.length === 0) return cur;
+      if (cur < 1) return 1;
+      if (cur <= data.length) return cur;
+      else return prev;
+    });
+  }
+  const handleend = (e) => {
+    setend(prev => {
+      if (e.target.value === '') return Infinity;
+      if (e.target.value[e.target.value - 1] === '.' || e.target.value[e.target.value - 1] === '-') return prev;
+      let cur = Number(e.target.value);
+      if (!data.length) return cur;
+      if (cur < 1) return 1;
+      while (cur > data.length) {
+        cur = String(cur).substring(1);
+        cur = Number(cur);
+      }
+      return cur;
+    });
+  }
+  const fetchData = useCallback(async (link) => {
     const apiKey = process.env.REACT_APP_API_KEY;
     const playlistId = extractPlaylistId(link);
     if (!playlistId) {
       setdata([]);
-      return;
+      return -1;
     }
     const playlistItemsUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&playlistId=${playlistId}&key=${apiKey}`;
     const videoIds = [];
     let nextPageToken = '';
-    if (link === "") return;
+    if (link === "") {
+      setdata([]);
+      return -1;
+    }
     do {
       let response;
       try {
         response = await fetch(playlistItemsUrl + (nextPageToken ? `&pageToken=${nextPageToken}` : ''));
         if (!response.ok) {
           if (response.status === 404) {
+            setresultmessage("");
+            inputref.current.focus();
             setdata([]);
-            setstart(-1);
-            setend(Infinity);
+            console.error("Playlist not found.");
           }
           return;
         }
       }
       catch (error) {
+        console.log(error);
+        setdata([]);
         alert("Network Error");
+        inputref.current.focus();
+        return;
       }
       const curdata = await response.json();
       if (!curdata || !curdata.items) return;
@@ -44,7 +80,6 @@ function App() {
       nextPageToken = curdata.nextPageToken;
     }
     while (nextPageToken);
-    // Fetch video details in batches of 50
     const videoDetails = [];
     for (let i = 0; i < videoIds.length; i += 50) {
       const batchIds = videoIds.slice(i, i + 50).join(',');
@@ -53,55 +88,13 @@ function App() {
       const videoData = await videoResponse.json();
       videoDetails.push(...videoData.items);
     }
-
     setdata(videoDetails);
-  }, [link]);
+  }, []);
 
-  useEffect(() => {
-    fetchData();
-    setshowdetail(false);
-  }, [link, fetchData]);
-  useEffect(() => {
-    setshowdetail(false);
-    document.getElementById('result').innerText = '';
-  }, [start, end])
-  const handlerequest = async () => {
-    const startIndex = (start > 0) ? (start - 1) : 0;
-    const endIndex = (end === Infinity) ? (end) : (end - 1);
-    if (link.length === 0) {
-      alert("Link cannot be left empty.");
-      setshowdetail(false);
-      return;
-    }
-    if (!data || !data.length) {
-      alert(`Please enter a valid YouTube playlist URL. `);
-      setshowdetail(false);
-      return;
-    }
-    try {
-      const totalDuration = await getPlaylistDuration(startIndex, endIndex);
-      document.getElementById('result').innerText = `Total Duration: ${formatDuration(totalDuration)}`;
-      setshowdetail(true);
-    } catch (error) {
-      console.error(error);
-      setshowdetail(false)
-      document.getElementById('result').innerText = 'Error fetching playlist duration.';
-    }
-  }
   function extractPlaylistId(url) {
     const regex = /[?&]list=([^&]+)/;
     const match = url.match(regex);
     return match ? match[1] : null;
-  }
-  async function getPlaylistDuration(startIndex, endIndex) {
-    const selectedVideoIds = data.slice(startIndex, endIndex + 1);
-    const videoDurations = await getVideoDurations(selectedVideoIds);
-    const curtime = [0, 0, 0, 0];
-    for (let i = 0; i < videoDurations.length; i++) {
-      for (let j = 0; j < curtime.length; j++) curtime[j] += videoDurations[i][j];
-      updatetime(curtime);
-    }
-    return curtime;
   }
   function updatetime(time) {
     if (time[3] >= 60) {
@@ -116,12 +109,6 @@ function App() {
       time[0] += Math.floor(time[1] / 24);
       time[1] %= 24;
     }
-  }
-  async function getVideoDurations(data) {
-    return data.map(item => {
-      const duration = item.contentDetails.duration;
-      return parseISO8601Duration(duration);
-    });
   }
 
   function parseISO8601Duration(duration) {
@@ -138,62 +125,61 @@ function App() {
     if (time[0]) return `${days}d ${hours}h ${minutes}m ${remainingSeconds}s`;
     else return `${hours}h ${minutes}m ${remainingSeconds}s`;
   }
-  const handleformrequest = (e) => {
-    e.preventDefault();
+  const getrawtimes = () => {
+    let arr = [];
+    let startidx = ((start === -1) ? (1) : start) - 1;
+    let endidx = ((end === Infinity) ? (data.length) : end) - 1;
+    let curtime = [0, 0, 0, 0], totaltime = [0, 0, 0, 0]
+    for (let i = startidx; i <= endidx; i++) {
+      let idx = i + 1;
+      curtime = parseISO8601Duration(data[idx - 1].contentDetails.duration);
+      for (let j = 0; j < 4; j++) {
+        totaltime[j] += curtime[j];
+      }
+      updatetime(totaltime);
+      arr.push({ idx: idx, curtime: curtime, totaltime: [...totaltime] });
+    }
+    settime(arr);
+    return arr;
   }
-
-  const checkfocus = (e) => {
-    if (!data.length) {
-      if (link !== '')
-        alert(`Your playlist is not correct so you cannot go to ${e.target.id} input field`);
-      else
-        alert(`Your playlist field cannot be left empty please fill it.`);
-      inputref.current.focus();
-      document.getElementById("result").innerText = "";
-    }
-    else {
-      e.target.removeAttribute("readonly")
-    }
+  useEffect(() => {
+    getrawtimes();
+  }, [data]);
+  const handleformrequest = async (e) => {
+    e.preventDefault();
+    const rawtimes = getrawtimes();
+    checkfocus();
+    if (data.length === 0) return;
+    setresultmessage(`Total Duration: ${formatDuration(rawtimes[rawtimes.length - 1]['totaltime'])}`);
+  }
+  const handlechangelink = (e) => {
+    const cur = e.target.value;
+    changelink(cur);
+    setresultmessage("");
+  }
+  const checkfocus = async (e) => {
+    if (fetching) return;
+    setFetching(true);
+    await fetchData(link);
+    setFetching(false);
   }
   return (
     <div className="container">
       <h1>YouTube Playlist Duration Calculator</h1>
-      <form method='post' onSubmit={(e) => { handleformrequest(e); }}>
+      <form method='post' onSubmit={handleformrequest}>
 
         <label htmlFor="link">Enter the link of the YouTube playlist:</label>
-        <input type="text" id="link" placeholder="Playlist URL" autoComplete="off" autoFocus value={link} onChange={(e) => { changelink(e.target.value); }} ref={inputref} onFocus={(e) => { setstart(-1); setend(Infinity); }}></input>
+        <input type="text" id="link" ref={inputref} placeholder="Playlist URL" autoComplete="off" autoFocus value={link} onChange={(e) => { handlechangelink(e); }} onFocus={(e) => { setstart(-1); setend(Infinity); }} onBlur={checkfocus}></input>
 
         <label htmlFor="start">Starting Video Index (1-based):</label>
-        <input type="number" id="start" placeholder="Start Index(Optional)" value={(start === -1) ? '' : start} onFocus={e => { checkfocus(e); }} readOnly onBlur={(e) => { e.target.setAttribute("Readonly", 'true') }} onChange={(e) => {
-          setstart(prev => {
-            if (e.target.value === '') return -1;
-            const cur = Number(e.target.value);
-            if (cur > end) return end;
-            if (data.length === 0) return cur;
-            if (cur < 1) return 1;
-            if (cur <= data.length) return cur;
-            else return prev;
-          });
-        }} />
+        <input type="number" id="start" placeholder="Start Index(Optional)" value={(start === -1) ? '' : start} onChange={(e) => handlestart(e)} />
 
         <label htmlFor="end">Ending Video Index (1-based):</label>
-        <input type="number" id="end" placeholder="End Index(Optional)" value={end === Infinity ? '' : end} onFocus={e => { checkfocus(e); }} readOnly onBlur={(e) => { e.target.setAttribute("Readonly", 'true'); if (end < start) setend(start); }} onChange={(e) => {
-          setend(prev => {
-            if (e.target.value === '') return Infinity;
-            let cur = Number(e.target.value);
-            if (!data.length) return cur;
-            if (cur < 1) return 1;
-            while (cur > data.length) {
-              cur = String(cur).substring(1);
-              cur = Number(cur);
-            }
-            return cur;
-          });
-        }} />
+        <input type="number" id="end" placeholder="End Index(Optional)" value={end === Infinity ? '' : end} onBlur={() => { if (end < start) setend(start); }} onChange={(e) => handleend(e)} />
 
-        <button id="calculate" type='submit' onClick={handlerequest}>Get Total Duration</button>
-        <p id="result"></p>
-        <ShowDetails visibility={showdetail} start={start} end={end} parseISO8601Duration={parseISO8601Duration} formatDuration={formatDuration} data={data} updatetime={updatetime}></ShowDetails>
+        <button id="calculate" type='submit' onClick={handleformrequest}>Get Total Duration</button>
+        <p id="result">{resultmessage}</p>
+        <ShowDetails data={time} formatDuration={formatDuration}></ShowDetails>
       </form >
     </div >
   );
