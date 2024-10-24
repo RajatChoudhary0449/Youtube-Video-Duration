@@ -11,11 +11,15 @@ function App() {
   const [fetching, setFetching] = useState(false);
   const [resultmessage, setresultmessage] = useState("");
   const inputref = useRef();
-  const handlestart = (e) => {
+  const handlestart = async (e) => {
+    console.log(e);
     setstart(prev => {
-      if (e.target.value === '') return -1;
-      if (e.target.value[e.target.value - 1] === '.' || e.target.value[e.target.value - 1] === '-') return prev;
-      const cur = Number(e.target.value);
+      if (e.target.value === '') {
+        document.querySelector("#start").value = "";
+        return -1;
+      }
+      const cur = Math.floor(Number(e.target.value));
+      if (prev === cur) return cur;
       if (cur > end) return end;
       if (data.length === 0) return cur;
       if (cur < 1) return 1;
@@ -25,9 +29,12 @@ function App() {
   }
   const handleend = (e) => {
     setend(prev => {
-      if (e.target.value === '') return Infinity;
-      if (e.target.value[e.target.value - 1] === '.' || e.target.value[e.target.value - 1] === '-') return prev;
+      if (e.target.value === '') {
+        document.querySelector("#end").value = "";
+        return Infinity;
+      }
       let cur = Number(e.target.value);
+      if (prev === cur) return cur;
       if (!data.length) return cur;
       if (cur < 1) return 1;
       while (cur > data.length) {
@@ -161,6 +168,7 @@ function App() {
     if (fetching) return;
     setFetching(true);
     await fetchData(link);
+    if (!link.length) inputref.current.focus();
     setFetching(false);
   }
   return (
@@ -169,13 +177,13 @@ function App() {
       <form method='post' onSubmit={handleformrequest}>
 
         <label htmlFor="link">Enter the link of the YouTube playlist:</label>
-        <input type="text" id="link" ref={inputref} placeholder="Playlist URL" autoComplete="off" autoFocus value={link} onChange={(e) => { handlechangelink(e); }} onFocus={(e) => { setstart(-1); setend(Infinity); }} onBlur={checkfocus}></input>
+        <input type="text" id="link" ref={inputref} placeholder="Playlist URL" autoFocus value={link} onChange={(e) => { handlechangelink(e); }} onFocus={(e) => { setstart(-1); setend(Infinity); }} onBlur={checkfocus}></input>
 
         <label htmlFor="start">Starting Video Index (1-based):</label>
         <input type="number" id="start" placeholder="Start Index(Optional)" value={(start === -1) ? '' : start} onChange={(e) => handlestart(e)} />
 
         <label htmlFor="end">Ending Video Index (1-based):</label>
-        <input type="number" id="end" placeholder="End Index(Optional)" value={end === Infinity ? '' : end} onBlur={() => { if (end < start) setend(start); }} onChange={(e) => handleend(e)} />
+        <input type="number" step="1" id="end" placeholder="End Index(Optional)" value={end === Infinity ? '' : end} onBlur={() => { if (end < start) setend(start); }} onChange={(e) => handleend(e)} />
 
         <button id="calculate" type='submit' onClick={handleformrequest}>Get Total Duration</button>
         <p id="result">{resultmessage}</p>

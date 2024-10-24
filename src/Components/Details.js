@@ -3,12 +3,12 @@ import ListItem from './ListItem';
 import './Details.css';
 export default function Details(props) {
     const { items, isvisible } = props;
+    if (!isvisible) return (<></>);
     function formatDuration(time) {
         const [days, hours, minutes, remainingSeconds] = time;
         if (time[0]) return `${days}d ${hours}h ${minutes}m ${remainingSeconds}s`;
         else return `${hours}h ${minutes}m ${remainingSeconds}s`;
     }
-    if (!isvisible) return (<></>);
     if (items.length === 0) return <p>No Items to show</p>;
     return (
         <table>
