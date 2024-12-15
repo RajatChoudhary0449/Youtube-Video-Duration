@@ -10,6 +10,7 @@ function App() {
   const [time, settime] = useState([]);
   const [fetching, setFetching] = useState(false);
   const [resultmessage, setresultmessage] = useState("");
+  const [averagemessage, setaveragemessage] = useState("");
   const inputref = useRef();
   const handlestart = async (e) => {
     console.log(e);
@@ -65,6 +66,7 @@ function App() {
         if (!response.ok) {
           if (response.status === 404) {
             setresultmessage("");
+            setaveragemessage("");
             inputref.current.focus();
             setdata([]);
             console.error("Playlist not found.");
@@ -85,6 +87,7 @@ function App() {
         videoIds.push(item.contentDetails.videoId);
       });
       nextPageToken = curdata.nextPageToken;
+      console.log(nextPageToken)
     }
     while (nextPageToken);
     const videoDetails = [];
@@ -132,6 +135,18 @@ function App() {
     if (time[0]) return `${days}d ${hours}h ${minutes}m ${remainingSeconds}s`;
     else return `${hours}h ${minutes}m ${remainingSeconds}s`;
   }
+  const getaveragetime = (time, count) => {
+    const avg = [0, 0, 0, 0];
+    time[1] += 24 * time[0];
+    time[0] = 0;
+    for (let i = 1; i < time.length; i++) {
+      avg[i] = Math.floor(time[i] / count);
+      let cutoff = time[i] % count;
+      if (i !== time.length - 1) time[i + 1] += cutoff * 60;
+    }
+    updatetime(avg);
+    return avg;
+  }
   const getrawtimes = () => {
     let arr = [];
     let startidx = ((start === -1) ? (1) : start) - 1;
@@ -158,11 +173,13 @@ function App() {
     checkfocus();
     if (data.length === 0) return;
     setresultmessage(`Total Duration: ${formatDuration(rawtimes[rawtimes.length - 1]['totaltime'])}`);
+    setaveragemessage(`Average Duration: ${formatDuration(getaveragetime([...rawtimes[rawtimes.length - 1]['totaltime']], rawtimes.length))}`);
   }
   const handlechangelink = (e) => {
     const cur = e.target.value;
     changelink(cur);
     setresultmessage("");
+    setaveragemessage("");
   }
   const checkfocus = async (e) => {
     if (fetching) return;
@@ -187,6 +204,7 @@ function App() {
 
         <button id="calculate" type='submit' onClick={handleformrequest}>Get Total Duration</button>
         <p id="result">{resultmessage}</p>
+        <p>{averagemessage}</p>
         <ShowDetails data={time} formatDuration={formatDuration}></ShowDetails>
       </form >
     </div >
